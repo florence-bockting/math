@@ -9,6 +9,7 @@
 #include <stan/math/mix/functor/gradient_dot_vector.hpp>
 #include <stan/math/mix/functor/hessian.hpp>
 #include <stan/math/mix/functor/laplace_base_rng.hpp>
+#include <stan/math/mix/functor/laplace_base_solve.hpp>
 #include <stan/math/mix/functor/laplace_likelihood.hpp>
 #include <stan/math/mix/functor/laplace_marginal_density.hpp>
 #include <stan/math/mix/functor/hessian_block_diag.hpp>
