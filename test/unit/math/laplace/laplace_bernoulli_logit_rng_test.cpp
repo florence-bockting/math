@@ -92,4 +92,38 @@ TEST(laplace_bernoulli_logit_rng, two_dim_diag) {
   EXPECT_NEAR(theta_benchmark(0), theta_pred(0), tol);
   EXPECT_NEAR(theta_benchmark(1), theta_pred(1), tol);
 }
+
+TEST(laplace_latent_solve, two_dim_diag_solve) {
+  using stan::math::algebra_solver;
+  using stan::math::bernoulli_logit_likelihood;
+  using stan::math::laplace_latent_solve;
+  using stan::math::multi_normal_rng;
+  using stan::math::to_vector;
+
+  Eigen::VectorXd theta_0{{0, 0}};
+  Eigen::VectorXd phi{{3, 2}};
+  std::vector<int> n_samples = {1, 1};
+  std::vector<int> sums = {1, 0};
+  Eigen::VectorXd ye{{1, 1}};
+  Eigen::VectorXd mean{{0, 0}};
+  std::vector<double> d0;
+  std::vector<int> di0;
+  boost::random::mt19937 rng;
+  rng.seed(1954);
+  auto [post_mean, cholesky_factor] = laplace_latent_solve(
+      bernoulli_logit_likelihood{},
+      std::forward_as_tuple(to_vector(sums), n_samples, mean), 1,
+      diagonal_kernel_functor{}, std::forward_as_tuple(phi(0), phi(1)),
+      nullptr);
+
+  // Compute exact mean and covariance
+  Eigen::VectorXd theta_root
+      = algebra_solver(stationary_point{}, theta_0, phi, d0, di0);
+  Eigen::MatrixXd K_laplace = laplace_covariance(theta_root, phi);
+  Eigen::MatrixXd Sigma = cholesky_factor * cholesky_factor.transpose();
+
+  double tol = 1e-3;
+  EXPECT_NEAR(post_mean(0), theta_root(0), tol);
+  EXPECT_NEAR(Sigma(1), K_laplace(1), tol);
+}
 }  // namespace
