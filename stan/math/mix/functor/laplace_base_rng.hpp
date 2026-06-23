@@ -1,10 +1,8 @@
 #ifndef STAN_MATH_MIX_FUNCTOR_LAPLACE_BASE_RNG_HPP
 #define STAN_MATH_MIX_FUNCTOR_LAPLACE_BASE_RNG_HPP
 
-#include <stan/math/prim/fun/Eigen.hpp>
-#include <stan/math/mix/functor/laplace_marginal_density.hpp>
 #include <stan/math/prim/prob/multi_normal_cholesky_rng.hpp>
-#include <stan/math/prim/prob/multi_normal_rng.hpp>
+#include <stan/math/mix/functor/laplace_base_solve.hpp>
 
 namespace stan {
 namespace math {
@@ -38,30 +36,10 @@ inline Eigen::VectorXd laplace_base_rng(
     LLFunc&& ll_fun, LLArgs&& ll_args, CovarFun&& covariance_function,
     CovarArgs&& covar_args, const laplace_options<InitTheta>& options, RNG& rng,
     std::ostream* msgs) {
-  Eigen::MatrixXd covariance_train = stan::math::apply(
-      [msgs, &covariance_function](auto&&... args) {
-        return covariance_function(std::forward<decltype(args)>(args)..., msgs);
-      },
-      std::forward<CovarArgs>(covar_args));
-  auto md_est = internal::laplace_marginal_density_est(
-      ll_fun, std::forward<LLArgs>(ll_args), covariance_train, options, msgs);
-  Eigen::VectorXd mean_train = covariance_train * md_est.theta_grad;
-  if (options.solver == 1 || options.solver == 2) {
-    Eigen::MatrixXd V_dec
-        = md_est.L.template triangularView<Eigen::Lower>().solve(
-            md_est.W_r * covariance_train);
-    Eigen::MatrixXd Sigma = covariance_train - V_dec.transpose() * V_dec;
-    return multi_normal_rng(std::move(mean_train), std::move(Sigma), rng);
-  } else {
-    Eigen::MatrixXd Sigma
-        = covariance_train
-          - covariance_train
-                * (md_est.W_r
-                   - md_est.W_r
-                         * md_est.LU.solve(covariance_train * md_est.W_r))
-                * covariance_train;
-    return multi_normal_rng(std::move(mean_train), std::move(Sigma), rng);
-  }
+  auto [mean_train, cholesky_factor] = laplace_base_solve(
+      ll_fun, ll_args, covariance_function, covar_args, options, msgs);
+  return multi_normal_cholesky_rng(std::move(mean_train),
+                                   std::move(cholesky_factor), rng);
 }
 
 }  // namespace math
